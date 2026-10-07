@@ -156,10 +156,12 @@ def from_html(url):
 
 
 STORES = {
-    "Kabum": kabum,
+        "Kabum": lambda: from_html("https://www.kabum.com.br/busca/ps5-slim"),
     "Magalu": lambda: from_html("https://www.magazineluiza.com.br/busca/ps5+slim/"),
     "Americanas": lambda: from_html("https://www.americanas.com.br/busca/ps5-slim"),
     "Mercado Livre": lambda: from_html("https://lista.mercadolivre.com.br/ps5-slim"),
+    "Carrefour": lambda: from_html("https://www.carrefour.com.br/busca/ps5-slim"),
+     "Shopee": lambda: from_html("https://shopee.com.br/search?keyword=ps5%20slim"),
 }
 
 
