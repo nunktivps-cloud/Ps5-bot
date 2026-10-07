@@ -9,7 +9,7 @@ MIN_PRICE = 2000  # ignora acessórios e jogos
 TEST = os.environ.get("TEST", "") not in ("", "0")
 STATE_FILE = "state.json"
 
-BAD = ["825", "controle", "dualsense", "capa ", "suporte", "headset", "pulse",
+BAD = ["controle", "dualsense", "capa ", "suporte", "headset", "pulse",
        "cabo", "carregador", "ps4", "playstation 4", "ps vita", "portal", "base ",
        "usado", "seminovo", "semi-novo", "recondicionado", "defeito", "sucata", "caixa vazia", "peças"]
 MARKETPLACES = ("Mercado Livre", "Shopee")
