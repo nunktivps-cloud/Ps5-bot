@@ -1,10 +1,10 @@
 """Monitor de preço PS5 Slim -> Telegram. Só usa a biblioteca padrão."""
 import json, os, re, urllib.request, urllib.parse
 
-TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+TOKEN = re.sub(r"[^A-Za-z0-9:_-]", "", os.environ.get("TELEGRAM_TOKEN", ""))
+CHAT_ID = re.sub(r"[^0-9-]", "", os.environ.get("TELEGRAM_CHAT_ID", ""))
 BUY_PRICE = float(os.environ.get("MAX_PRICE", "3700"))    # meta de compra
-ALERT_MAX = float(os.environ.get("ALERT_MAX", "3900"))    # avisa também preços "perto" da meta
+ALERT_MAX = float(os.environ.get("ALERT_MAX", "9999"))    # avisa também preços "perto" da meta
 MIN_PRICE = 2000  # ignora acessórios e jogos
 TEST = os.environ.get("TEST", "") not in ("", "0")
 STATE_FILE = "state.json"
