@@ -182,10 +182,10 @@ STORES = {
     "Buscapé": lambda: from_html("https://www.buscape.com.br/search?q=ps5+slim"),
     "Zoom": lambda: from_html("https://www.zoom.com.br/search?q=ps5+slim"),
     "Magalu": lambda: from_html("https://www.magazineluiza.com.br/busca/ps5+slim/"),
-    "Americanas": lambda: from_html("https://www.americanas.com.br/busca/ps5-slim"),
+    "Americanas": lambda: from_html("https://www.americanas.com.br/busca/ps5-slim?q=playstation+5+slim&fuzzy=0&operator=and&facets=fuzzy%2Coperator&sort=score_desc&page=0"),
     "Mercado Livre": lambda: from_html("https://lista.mercadolivre.com.br/ps5-slim"),
     "Carrefour": lambda: from_html("https://www.carrefour.com.br/busca/ps5-slim"),
-    "Shopee": lambda: from_html("https://shopee.com.br/search?keyword=ps5%20slim"),
+    "Shopee": lambda: from_html("https://shopee.com.br/list/Playstation/5/Slim"),
 }
 
 
