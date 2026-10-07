@@ -1,16 +1,17 @@
-"""Monitor de preço PS5 Slim -> Telegram. Só usa a biblioteca padrão."""
+"""Monitor de preço PS5 Slim -> Telegram (com foto). Só usa a biblioteca padrão."""
 import json, os, re, urllib.request, urllib.parse
 
 TOKEN = re.sub(r"[^A-Za-z0-9:_-]", "", os.environ.get("TELEGRAM_TOKEN", ""))
 CHAT_ID = re.sub(r"[^0-9-]", "", os.environ.get("TELEGRAM_CHAT_ID", ""))
-BUY_PRICE = float(os.environ.get("MAX_PRICE", "3700"))    # meta de compra
-ALERT_MAX = float(os.environ.get("ALERT_MAX", "9999"))    # avisa também preços "perto" da meta
+BUY_PRICE = float(os.environ.get("MAX_PRICE", "3750"))      # meta de compra
+ALERT_MAX = float(os.environ.get("ALERT_MAX", "4199.99"))   # só avisa até esse valor
 MIN_PRICE = 2000  # ignora acessórios e jogos
 TEST = os.environ.get("TEST", "") not in ("", "0")
 STATE_FILE = "state.json"
 
 BAD = ["digital", "controle", "dualsense", "capa ", "suporte", "headset", "pulse",
        "cabo", "carregador", "ps4", "playstation 4", "ps vita", "portal", "base "]
+GAMES = r"jogo|game|astro bot|gran turismo|god of war|spider|fc ?2\d|ea sports|ratchet|horizon|last of us|ghost|returnal|call of duty|mortal kombat"
 
 UA = ("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
@@ -44,25 +45,6 @@ def brl(v):
     return "R$ " + "{:,.2f}".format(v).replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-# ---------- Kabum (API interna) ----------
-def kabum():
-    q = urllib.parse.urlencode({"query": "ps5 slim", "page_number": 1, "page_size": 40})
-    data = json.loads(fetch("https://servicespub.prod.api.kabum.com.br/catalog/v2/products?" + q))
-    out = []
-    for it in data.get("data", []):
-        a = it.get("attributes", {})
-        pix = to_float(a.get("price_with_discount") or (a.get("offer") or {}).get("price_with_discount"))
-        full = to_float(a.get("price"))
-        price = pix or full
-        parcel = full if (pix and full and full > pix) else None
-        link = a.get("product_link") or "/produto/%s" % it.get("id")
-        out.append(dict(title=a.get("title", ""), price=price, pix=pix if parcel else None,
-                        parcel=parcel, inst=None, coupon=None,
-                        url=urllib.parse.urljoin("https://www.kabum.com.br", link)))
-    return out
-
-
-# ---------- Lojas por HTML (lê JSON embutido na página) ----------
 PRICE_KEYS = ("bestPrice", "priceWithDiscount", "price_with_discount", "salePrice", "lowPrice", "price")
 
 
@@ -105,6 +87,18 @@ def price_of(d):
         off = off[0]
     if isinstance(off, dict):
         return price_of(off)
+    return None
+
+
+def image_of(d):
+    for k in ("image", "imageUrl", "image_url", "thumbnail", "photo", "img"):
+        v = d.get(k)
+        if isinstance(v, list) and v:
+            v = v[0]
+        if isinstance(v, dict):
+            v = v.get("url") or v.get("src")
+        if isinstance(v, str) and v.startswith(("http", "//")):
+            return "https:" + v if v.startswith("//") else v
     return None
 
 
@@ -151,17 +145,19 @@ def from_html(url):
             seen.add((name.lower(), p))
             pix, parcel, inst, coupon = extras(d, p)
             out.append(dict(title=name, price=pix or p, pix=pix, parcel=parcel, inst=inst,
-                            coupon=coupon, url=urllib.parse.urljoin(url, link)))
+                            coupon=coupon, image=image_of(d), url=urllib.parse.urljoin(url, link)))
     return out
 
 
 STORES = {
-        "Kabum": lambda: from_html("https://www.kabum.com.br/busca/ps5-slim"),
+    "Kabum": lambda: from_html("https://www.kabum.com.br/busca/ps5-slim"),
+    "Buscapé": lambda: from_html("https://www.buscape.com.br/search?q=ps5+slim"),
+    "Zoom": lambda: from_html("https://www.zoom.com.br/search?q=ps5+slim"),
     "Magalu": lambda: from_html("https://www.magazineluiza.com.br/busca/ps5+slim/"),
     "Americanas": lambda: from_html("https://www.americanas.com.br/busca/ps5-slim"),
     "Mercado Livre": lambda: from_html("https://lista.mercadolivre.com.br/ps5-slim"),
     "Carrefour": lambda: from_html("https://www.carrefour.com.br/busca/ps5-slim"),
-     "Shopee": lambda: from_html("https://shopee.com.br/search?keyword=ps5%20slim"),
+    "Shopee": lambda: from_html("https://shopee.com.br/search?keyword=ps5%20slim"),
 }
 
 
@@ -171,14 +167,17 @@ def is_console(title):
 
 
 def variant(title):
-    return "com 2 jogos" if re.search(r"(2|dois)\s*jogos|2 games", title.lower()) else "só o console"
+    return "com jogos" if re.search(GAMES, title.lower()) else "só o console"
 
 
-def build_msg(it, store, record, buy):
+def build_msg(it, store, record, p):
     L = []
     if record:
         L.append("🏆 MENOR PREÇO até agora (%s)" % variant(it["title"]))
-    L.append("✅ ABAIXO DA META (%s)" % brl(BUY_PRICE) if buy else "⚠️ Perto da meta (%s)" % brl(BUY_PRICE))
+    if p <= BUY_PRICE:
+        L.append("✅ ABAIXO DA META (%s)" % brl(BUY_PRICE))
+    else:
+        L.append("📉 Ainda %s acima da meta (%s)" % (brl(p - BUY_PRICE), brl(BUY_PRICE)))
     L.append(it["title"])
     if it.get("pix"):
         L.append("💰 Pix/à vista: " + brl(it["pix"]))
@@ -192,12 +191,22 @@ def build_msg(it, store, record, buy):
     return "\n".join(L)
 
 
-def telegram(text):
+def tg(method, params):
+    data = urllib.parse.urlencode(params).encode()
+    return urllib.request.urlopen("https://api.telegram.org/bot%s/%s" % (TOKEN, method), data, timeout=25)
+
+
+def telegram(text, photo=None):
     if not TOKEN or not CHAT_ID:
         print("[sem Telegram]", text)
         return
-    data = urllib.parse.urlencode({"chat_id": CHAT_ID, "text": text}).encode()
-    urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % TOKEN, data, timeout=20)
+    if photo:
+        try:
+            tg("sendPhoto", {"chat_id": CHAT_ID, "photo": photo, "caption": text[:1000]})
+            return
+        except Exception as e:
+            print("foto falhou:", e)
+    tg("sendMessage", {"chat_id": CHAT_ID, "text": text})
 
 
 def main():
@@ -215,7 +224,8 @@ def main():
             report.append("%s: ERRO (%s)" % (store, str(e)[:60]))
             continue
         cons = [it for it in items if it.get("price") and it["price"] >= MIN_PRICE and is_console(it["title"])]
-        report.append("%s: %d itens, %d consoles" % (store, len(items), len(cons)))
+        low = (" (menor: %s)" % brl(min(i["price"] for i in cons))) if cons else ""
+        report.append("%s: %d itens, %d consoles%s" % (store, len(items), len(cons), low))
         found += [(store, it) for it in cons]
 
     alerts = []
@@ -228,10 +238,10 @@ def main():
             best[v] = p
         seen[u] = p
         if p <= ALERT_MAX and (record or changed):
-            alerts.append(build_msg(it, store, record, p <= BUY_PRICE))
+            alerts.append((build_msg(it, store, record, p), it.get("image")))
     print("\n".join(report))
-    for a in alerts[:5]:
-        telegram(a)
+    for text, img in alerts[:5]:
+        telegram(text, img)
     if TEST:
         telegram("✅ Teste do monitor\n" + "\n".join(report) +
                  "\nMelhores até agora: " + (", ".join("%s %s" % (k, brl(x)) for k, x in best.items()) or "nenhum"))
