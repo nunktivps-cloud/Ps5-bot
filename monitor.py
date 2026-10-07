@@ -196,17 +196,20 @@ def tg(method, params):
     return urllib.request.urlopen("https://api.telegram.org/bot%s/%s" % (TOKEN, method), data, timeout=25)
 
 
-def telegram(text, photo=None):
+def telegram(text, photo=None, url=None):
     if not TOKEN or not CHAT_ID:
         print("[sem Telegram]", text)
         return
+    extra = {}
+    if url:
+        extra["reply_markup"] = json.dumps({"inline_keyboard": [[{"text": "🛒 Ver oferta", "url": url}]]})
     if photo:
         try:
-            tg("sendPhoto", {"chat_id": CHAT_ID, "photo": photo, "caption": text[:1000]})
+            tg("sendPhoto", dict(chat_id=CHAT_ID, photo=photo, caption=text[:1000], **extra))
             return
         except Exception as e:
             print("foto falhou:", e)
-    tg("sendMessage", {"chat_id": CHAT_ID, "text": text})
+    tg("sendMessage", dict(chat_id=CHAT_ID, text=text, **extra))
 
 
 def main():
@@ -228,23 +231,32 @@ def main():
         report.append("%s: %d itens, %d consoles%s" % (store, len(items), len(cons), low))
         found += [(store, it) for it in cons]
 
-    alerts = []
+    alerts, samples, done = [], [], set()
     for store, it in sorted(found, key=lambda x: x[1]["price"]):
         p, v, u = it["price"], variant(it["title"]), it["url"]
+        key = (re.sub(r"\W+", "", it["title"].lower()), round(p))
+        if key in done:  # mesma oferta repetida em outra loja/comparador
+            continue
+        done.add(key)
         record = p < best.get(v, 1e12) - 0.5
         last = seen.get(u)
         changed = last is None or p < last * 0.99
         if record:
             best[v] = p
         seen[u] = p
+        msg = (build_msg(it, store, record, p), it.get("image"), u)
+        if len(samples) < 3:
+            samples.append(msg)
         if p <= ALERT_MAX and (record or changed):
-            alerts.append((build_msg(it, store, record, p), it.get("image")))
+            alerts.append(msg)
     print("\n".join(report))
-    for text, img in alerts[:5]:
-        telegram(text, img)
+    for text, img, u in alerts[:5]:
+        telegram(text, img, u)
     if TEST:
         telegram("✅ Teste do monitor\n" + "\n".join(report) +
                  "\nMelhores até agora: " + (", ".join("%s %s" % (k, brl(x)) for k, x in best.items()) or "nenhum"))
+        for text, img, u in samples:
+            telegram("🧪 EXEMPLO de aviso\n" + text, img, u)
     json.dump(state, open(STATE_FILE, "w"))
 
 
