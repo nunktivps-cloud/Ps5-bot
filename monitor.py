@@ -9,7 +9,7 @@ MIN_PRICE = 2000  # ignora acessórios e jogos
 TEST = os.environ.get("TEST", "") not in ("", "0")
 STATE_FILE = "state.json"
 
-BAD = ["digital", "controle", "dualsense", "capa ", "suporte", "headset", "pulse",
+BAD = ["825", "controle", "dualsense", "capa ", "suporte", "headset", "pulse",
        "cabo", "carregador", "ps4", "playstation 4", "ps vita", "portal", "base "]
 GAMES = r"jogo|game|astro bot|gran turismo|god of war|spider|fc ?2\d|ea sports|ratchet|horizon|last of us|ghost|returnal|call of duty|mortal kombat"
 
